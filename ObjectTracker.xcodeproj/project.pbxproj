@@ -34,6 +34,13 @@
 			);
 			target = 023240B62C9E0DAA000B2A03 /* ObjectTracker */;
 		};
+		023241142CA1DACA000B2A03 /* Exceptions for "Reference Objects" folder in "ObjectTrackerTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"My Gatorade bottle_raw_ObjectMaskOn.referenceobject",
+			);
+			target = 023240D12C9E0DAB000B2A03 /* ObjectTrackerTests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -52,6 +59,9 @@
 		};
 		023240F42C9E17A0000B2A03 /* Reference Objects */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				023241142CA1DACA000B2A03 /* Exceptions for "Reference Objects" folder in "ObjectTrackerTests" target */,
+			);
 			path = "Reference Objects";
 			sourceTree = "<group>";
 		};

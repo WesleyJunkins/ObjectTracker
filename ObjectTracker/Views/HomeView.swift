@@ -12,26 +12,42 @@ import ARKit
 import RealityKit
 import UniformTypeIdentifiers
 
+/// The main user interface for the ObjectTracker app, responsible for managing and displaying
+/// reference objects, immersive space controls, and application state.
 struct HomeView: View {
+    /// Binds to the overall application state.
     @Bindable var appState: AppState
+
+    /// The identifier for the immersive space session.
     let immersiveSpaceIdentifier: String
-    
+
+    /// The file type for reference object files.
     let referenceObjectUTType = UTType("com.apple.arkit.referenceobject")!
 
+    /// Access the immersive space opening environment.
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+
+    /// Access the immersive space dismissal environment.
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+
+    /// Tracks the current lifecycle phase of the scene (e.g., active or background).
     @Environment(\.scenePhase) private var scenePhase
-    
+
+    /// State to track whether the file importer is open.
     @State private var fileImporterIsOpen = false
-    
+
+    /// The currently selected reference object ID, if any.
     @State var selectedReferenceObjectID: ReferenceObject.ID?
 
+    /// The body of the view, defining its layout and behavior.
     var body: some View {
         Group {
+            // Show the reference object list if the app can enter immersive space.
             if appState.canEnterImmersiveSpace {
                 referenceObjectList
                     .frame(minWidth: 400, minHeight: 300)
             } else {
+                // Display an informational message if immersive space is unavailable.
                 InfoLabel(appState: appState)
                     .padding(.horizontal, 30)
                     .frame(minWidth: 400, minHeight: 300)
@@ -41,8 +57,10 @@ struct HomeView: View {
         .glassBackgroundEffect()
         .toolbar {
             ToolbarItem(placement: .bottomOrnament) {
+                // Add controls for immersive space management.
                 if appState.canEnterImmersiveSpace {
                     VStack {
+                        // Button to start or stop tracking based on the immersive space state.
                         if !appState.isImmersiveSpaceOpened {
                             Button("Start Tracking \(appState.referenceObjectLoader.enabledReferenceObjectsCount) Object(s)") {
                                 Task {
@@ -66,7 +84,8 @@ struct HomeView: View {
                                     appState.didLeaveImmersiveSpace()
                                 }
                             }
-                            
+
+                            // Show a progress indicator if object tracking has not yet started.
                             if !appState.objectTrackingStartedRunning {
                                 HStack {
                                     ProgressView()
@@ -74,7 +93,8 @@ struct HomeView: View {
                                 }
                             }
                         }
-                        
+
+                        // Provide feedback about entering or leaving immersive space.
                         Text(appState.isImmersiveSpaceOpened ?
                              "This leaves the immersive space." :
                              "This enters an immersive space, hiding all other apps."
@@ -87,6 +107,7 @@ struct HomeView: View {
             }
         }
         .fileImporter(isPresented: $fileImporterIsOpen, allowedContentTypes: [referenceObjectUTType], allowsMultipleSelection: true) { results in
+            // Handle file import results.
             switch results {
             case .success(let fileURLs):
                 Task {
@@ -105,16 +126,15 @@ struct HomeView: View {
             }
         }
         .onChange(of: scenePhase, initial: true) {
+            // Handle changes in the app's scene phase.
             print("HomeView scene phase: \(scenePhase)")
             if scenePhase == .active {
                 Task {
-                    // When returning from the background, check if the authorization has changed.
+                    // Recheck authorization status when returning to the foreground.
                     await appState.queryWorldSensingAuthorization()
                 }
             } else {
-                // Make sure to leave the immersive space if this view is no longer active
-                // - such as when a person closes this view - otherwise they may be stuck
-                // in the immersive space without the controls this view provides.
+                // Ensure the immersive space is closed if the view is no longer active.
                 if appState.isImmersiveSpaceOpened {
                     Task {
                         await dismissImmersiveSpace()
@@ -124,7 +144,7 @@ struct HomeView: View {
             }
         }
         .onChange(of: appState.providersStoppedWithError, { _, providersStoppedWithError in
-            // Immediately close the immersive space if an error occurs.
+            // Close the immersive space immediately if an error occurs.
             if providersStoppedWithError {
                 if appState.isImmersiveSpaceOpened {
                     Task {
@@ -132,28 +152,27 @@ struct HomeView: View {
                         appState.didLeaveImmersiveSpace()
                     }
                 }
-                
                 appState.providersStoppedWithError = false
             }
         })
         .task {
-            // Ask for authorization before a person attempts to open the immersive space.
-            // This gives the app opportunity to respond gracefully if authorization isn't granted.
+            // Request authorization for world sensing if needed.
             if appState.allRequiredProvidersAreSupported {
                 await appState.requestWorldSensingAuthorization()
             }
         }
         .task {
-            // Start monitoring for changes in authorization, in case a person brings the
-            // Settings app to the foreground and changes authorizations there.
+            // Monitor changes in session events (e.g., authorization updates).
             await appState.monitorSessionEvents()
         }
     }
-    
+
+    /// A view displaying the list of reference objects.
     @MainActor
     var referenceObjectList: some View {
         NavigationSplitView {
             VStack(alignment: .leading) {
+                // List of reference objects with delete functionality.
                 List(selection: $selectedReferenceObjectID) {
                     ForEach(appState.referenceObjectLoader.referenceObjects, id: \.id) { referenceObject in
                         ListEntryView(referenceObject: referenceObject, referenceObjectLoader: appState.referenceObjectLoader)
@@ -164,6 +183,7 @@ struct HomeView: View {
                 }
                 .navigationTitle("Reference objects")
 
+                // Button to open the file importer for adding new reference objects.
                 Button {
                     fileImporterIsOpen = true
                 } label: {
@@ -174,8 +194,9 @@ struct HomeView: View {
             }
             .padding(.vertical)
             .disabled(appState.isImmersiveSpaceOpened)
-            
+
         } detail: {
+            // Detail view for the selected reference object.
             if !appState.referenceObjectLoader.didFinishLoading {
                 VStack {
                     Text("Loading reference objects…")
@@ -186,7 +207,7 @@ struct HomeView: View {
                 Text("Tap the + button to add reference objects, or include some in the 'Reference Objects' group of the app's Xcode project.")
             } else {
                 if let selectedObject = appState.referenceObjectLoader.referenceObjects.first(where: { $0.id == selectedReferenceObjectID }) {
-                    // Display the USDZ file that the reference object was displayed on in this detail view.
+                    // Display the associated USDZ file if available.
                     if let path = selectedObject.usdzFile, !fileImporterIsOpen {
                         Model3D(url: path) { model in
                             model
